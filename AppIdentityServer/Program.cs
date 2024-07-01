@@ -1,5 +1,6 @@
 using AppIdentityServer.IdentityConfiguration;
-using MyIdentityServer.IdentityConfiguration;
+using AppIdentityServer.Services;
+
 
 internal class Program
 {
@@ -15,8 +16,13 @@ internal class Program
             .AddInMemoryApiResources(Resources.GetApiResources())
             .AddInMemoryApiScopes(Scopes.GetApiScopes())
             .AddTestUsers(Users.Get())
-            .AddDeveloperSigningCredential();
+            .AddDeveloperSigningCredential()
+            .AddProfileService<ProfileService>();
+
+
         var app = builder.Build();
+
+
         if (app.Environment.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();

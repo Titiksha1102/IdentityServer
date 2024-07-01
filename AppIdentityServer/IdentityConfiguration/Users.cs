@@ -4,7 +4,7 @@ using IdentityModel;
 using IdentityServer4.Test;
 using System.Security.Claims;
 
-namespace MyIdentityServer.IdentityConfiguration
+namespace AppIdentityServer.IdentityConfiguration
 {
     public class Users
     {
@@ -19,11 +19,12 @@ namespace MyIdentityServer.IdentityConfiguration
                     Password = "efcrf",
                     Claims = new List<Claim>
                     {
-                        new Claim(JwtClaimTypes.Email, "support@procodeguide.com"),
+                        new Claim(JwtClaimTypes.Email, "manisha2000@gmail.com"),
                         new Claim(JwtClaimTypes.Role, "admin"),
-                        new Claim("Userid","1")
+                        new Claim("CustomClaim","CustomValue")
                     }
                 },
+                
                 new TestUser
                 {
                     SubjectId = "5",
@@ -31,9 +32,8 @@ namespace MyIdentityServer.IdentityConfiguration
                     Password = "rwferfrfe",
                     Claims = new List<Claim>
                     {
-                        new Claim(ClaimTypes.Email, "support@procodeguide.com"),
-                        new Claim(ClaimTypes.Role, "admin"),
-                        new Claim(ClaimTypes.Name,"5")
+                        new Claim(JwtClaimTypes.Email, "raj115@gmail.com"),
+                        new Claim(JwtClaimTypes.Role, "stduser")
                     }
                 },
                 new TestUser
@@ -44,8 +44,7 @@ namespace MyIdentityServer.IdentityConfiguration
                     Claims = new List<Claim>
                     {
                         new Claim(JwtClaimTypes.Email, "support@procodeguide.com"),
-                        new Claim(JwtClaimTypes.Role, "admin"),
-                        new Claim("Userid","3")
+                        new Claim(JwtClaimTypes.Role, "admin")
                     }
                 }
             };

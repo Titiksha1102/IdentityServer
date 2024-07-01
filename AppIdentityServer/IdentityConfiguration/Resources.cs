@@ -15,8 +15,15 @@ namespace AppIdentityServer.IdentityConfiguration
             new IdentityResources.Email(),
             new IdentityResource
             {
+                
                 Name = "role",
-                UserClaims = new List<string> {"role"}
+                UserClaims = { "role" }
+            },
+            new IdentityResource
+            {
+
+                Name = "CustomClaim",
+                UserClaims = { "CustomClaim" }
             }
         };
         }

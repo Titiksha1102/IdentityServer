@@ -16,7 +16,7 @@ namespace AppIdentityServer.IdentityConfiguration
             {
                 ClientId = "weatherApi",
                 ClientName = " ASP.NET Core NET Core Weather Api",
-                AllowedGrantTypes = GrantTypes.ClientCredentials,
+                AllowedGrantTypes = GrantTypes.ResourceOwnerPassword,
                 ClientSecrets = new List<Secret> {new Secret("ProCodeGuide".Sha256())},
                 AllowedScopes = new List<string> {"weatherApi.read"}
             },
@@ -28,14 +28,15 @@ namespace AppIdentityServer.IdentityConfiguration
                 
                 AllowedGrantTypes = GrantTypes.Code,
                 RedirectUris = new List<string> {"https://localhost:7011/signin-oidc"},
-                
+                PostLogoutRedirectUris = { "https://localhost:7011/signout-callback-oidc" },
                 AllowedScopes = new List<string>
                 {
-                    IdentityServerConstants.StandardScopes.OpenId,
-                    IdentityServerConstants.StandardScopes.Profile,
-                    IdentityServerConstants.StandardScopes.Email,
+                    "openid",
+                    "profile",
+                    "email",
                     "role",
-                    "weatherApi.read"
+                    "weatherApi.read",
+                    "CustomClaim"
                 },
                 RequirePkce = true,
                 AllowPlainTextPkce = false
