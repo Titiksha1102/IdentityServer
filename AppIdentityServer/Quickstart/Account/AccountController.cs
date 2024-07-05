@@ -13,10 +13,13 @@ using IdentityServer4.Test;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using AppIdentityServer.Models;
 
 namespace IdentityServerHost.Quickstart.UI
 {
@@ -29,7 +32,8 @@ namespace IdentityServerHost.Quickstart.UI
     [AllowAnonymous]
     public class AccountController : Controller
     {
-        private readonly TestUserStore _users;
+        private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly UserManager<IdentityUser> _userManager;
         private readonly IIdentityServerInteractionService _interaction;
         private readonly IClientStore _clientStore;
         private readonly IAuthenticationSchemeProvider _schemeProvider;
@@ -40,18 +44,48 @@ namespace IdentityServerHost.Quickstart.UI
             IClientStore clientStore,
             IAuthenticationSchemeProvider schemeProvider,
             IEventService events,
-            TestUserStore users = null)
+            SignInManager<IdentityUser> signInManager,
+            UserManager<IdentityUser> userManager)
         {
             // if the TestUserStore is not in DI, then we'll just use the global users collection
             // this is where you would plug in your own custom identity management library (e.g. ASP.NET Identity)
-            _users = users ?? new TestUserStore(TestUsers.Users);
-
+            _signInManager = signInManager;
+            _userManager = userManager;
             _interaction = interaction;
             _clientStore = clientStore;
             _schemeProvider = schemeProvider;
             _events = events;
         }
+        [HttpGet]
+        public async Task<IActionResult> Register(string returnUrl)
+        {
+            var model = new RegisterViewModel
+            {
+                ReturnUrl= returnUrl
+            };
+            return View();
+        }
+        [HttpPost]
+        public async Task<IActionResult> Register([FromBody] RegisterViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var username = model.Email.Split('@')[0];
+                var user = new IdentityUser { UserName = username, Email = model.Email };
+                var result = await _userManager.CreateAsync(user, model.Password);
 
+                if (result.Succeeded)
+                {
+                    return Redirect(model.ReturnUrl);
+                }
+                else
+                {
+                    return BadRequest(result.Errors);
+                }
+            }
+
+            return BadRequest(ModelState);
+        }
         /// <summary>
         /// Entry point into the login workflow
         /// </summary>
@@ -71,7 +105,7 @@ namespace IdentityServerHost.Quickstart.UI
         }
 
         /// <summary>
-        /// Handle postback from username/password login
+        /// Handle postback from username/Password login
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -109,63 +143,76 @@ namespace IdentityServerHost.Quickstart.UI
 
             if (ModelState.IsValid)
             {
-                // validate username/password against in-memory store
-                if (_users.ValidateCredentials(model.Username, model.Password))
+                var user = await _signInManager.UserManager.FindByNameAsync(model.Username);
+
+                if (user is not null)
                 {
-                    var user = _users.FindByUsername(model.Username);
-                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.Username, user.SubjectId, user.Username, clientId: context?.Client.ClientId));
+                    var userLogin = await _signInManager.CheckPasswordSignInAsync(user, model.Password, true);
 
-                    // only set explicit expiration here if user chooses "remember me". 
-                    // otherwise we rely upon expiration configured in cookie middleware.
-                    AuthenticationProperties props = null;
-                    if (AccountOptions.AllowRememberLogin && model.RememberLogin)
+                    if (userLogin == Microsoft.AspNetCore.Identity.SignInResult.Success)
                     {
-                        props = new AuthenticationProperties
+                        await _events.RaiseAsync(new UserLoginSuccessEvent(user.UserName, user.Id, user.UserName, clientId: context?.Client.ClientId));
+
+                        // only set explicit expiration here if user chooses "remember me". 
+                        // otherwise we rely upon expiration configured in cookie middleware.
+                        AuthenticationProperties props = null;
+                        if (AccountOptions.AllowRememberLogin && model.RememberLogin)
                         {
-                            IsPersistent = true,
-                            ExpiresUtc = DateTimeOffset.UtcNow.Add(AccountOptions.RememberMeLoginDuration)
+                            props = new AuthenticationProperties
+                            {
+                                IsPersistent = true,
+                                ExpiresUtc = DateTimeOffset.UtcNow.Add(AccountOptions.RememberMeLoginDuration)
+                            };
                         };
-                    };
 
-                    // issue authentication cookie with subject ID and username
-                    var isuser = new IdentityServerUser(user.SubjectId)
-                    {
-                        DisplayName = user.Username
-                    };
-
-                    await HttpContext.SignInAsync(isuser, props);
-
-                    if (context != null)
-                    {
-                        if (context.IsNativeClient())
+                        // issue authentication cookie with subject ID and username
+                        var isuser = new IdentityServerUser(user.Id)
                         {
-                            // The client is native, so this change in how to
-                            // return the response is for better UX for the end user.
-                            return this.LoadingPage("Redirect", model.ReturnUrl);
+                            DisplayName = user.UserName
+                        };
+
+                        await HttpContext.SignInAsync(isuser, props);
+
+                        if (context != null)
+                        {
+                            if (context.IsNativeClient())
+                            {
+                                // The client is native, so this change in how to
+                                // return the response is for better UX for the end user.
+                                return this.LoadingPage("Redirect", model.ReturnUrl);
+                            }
+
+                            // we can trust model.ReturnUrl since GetAuthorizationContextAsync returned non-null
+                            return Redirect(model.ReturnUrl);
                         }
 
-                        // we can trust model.ReturnUrl since GetAuthorizationContextAsync returned non-null
-                        return Redirect(model.ReturnUrl);
-                    }
-
-                    // request for a local page
-                    if (Url.IsLocalUrl(model.ReturnUrl))
-                    {
-                        return Redirect(model.ReturnUrl);
-                    }
-                    else if (string.IsNullOrEmpty(model.ReturnUrl))
-                    {
-                        return Redirect("~/");
+                        // request for a local page
+                        if (Url.IsLocalUrl(model.ReturnUrl))
+                        {
+                            return Redirect(model.ReturnUrl);
+                        }
+                        else if (string.IsNullOrEmpty(model.ReturnUrl))
+                        {
+                            return Redirect("~/");
+                        }
+                        else
+                        {
+                            // user might have clicked on a malicious link - should be logged
+                            throw new Exception("invalid return URL");
+                        }
                     }
                     else
                     {
-                        // user might have clicked on a malicious link - should be logged
-                        throw new Exception("invalid return URL");
+                        await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials", clientId: context?.Client.ClientId));
+                        ModelState.AddModelError(string.Empty, AccountOptions.InvalidCredentialsErrorMessage);
                     }
-                }
 
-                await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials", clientId:context?.Client.ClientId));
-                ModelState.AddModelError(string.Empty, AccountOptions.InvalidCredentialsErrorMessage);
+                }
+                else
+                {
+                    return View("RegisterRedirect");
+                }
+                
             }
 
             // something went wrong, show form with error
@@ -173,7 +220,7 @@ namespace IdentityServerHost.Quickstart.UI
             return View(vm);
         }
 
-        
+
         /// <summary>
         /// Show logout page
         /// </summary>
@@ -198,6 +245,7 @@ namespace IdentityServerHost.Quickstart.UI
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
+
         public async Task<IActionResult> Logout(LogoutInputModel model)
         {
             // build a model so the logged out page knows what to display
@@ -205,11 +253,17 @@ namespace IdentityServerHost.Quickstart.UI
 
             if (User?.Identity.IsAuthenticated == true)
             {
-                // delete local authentication cookie
-                await HttpContext.SignOutAsync();
+                // fetch user from UserManager
+                var user = await _userManager.GetUserAsync(User);
 
-                // raise the logout event
-                await _events.RaiseAsync(new UserLogoutSuccessEvent(User.GetSubjectId(), User.GetDisplayName()));
+                if (user != null)
+                {
+                    // delete local authentication cookie
+                    await _signInManager.SignOutAsync();
+
+                    // raise the logout event
+                    await _events.RaiseAsync(new UserLogoutSuccessEvent(user.Id, user.UserName));
+                }
             }
 
             // check if we need to trigger sign-out at an upstream identity provider
@@ -226,6 +280,7 @@ namespace IdentityServerHost.Quickstart.UI
 
             return Redirect("https://localhost:7011");
         }
+
 
         [HttpGet]
         public IActionResult AccessDenied()

@@ -1,49 +1,52 @@
 ﻿
 
+using AppIdentityServer.Models;
 using IdentityModel;
 using IdentityServer4.Test;
+using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 
 namespace AppIdentityServer.IdentityConfiguration
 {
     public class Users
     {
-        public static List<TestUser> Get()
+        public static List<SeedUserModel> Get()
         {
-            return new List<TestUser>
+            return new List<SeedUserModel>
             {
-                new TestUser
+
+                new SeedUserModel
                 {
-                    SubjectId = "1",
+                    
                     Username = "manisha",
-                    Password = "efcrf",
+                    Password = "Manisha@2000",
+                    Email="manisha2000@gmail.com",
                     Claims = new List<Claim>
                     {
-                        new Claim(JwtClaimTypes.Email, "manisha2000@gmail.com"),
                         new Claim(JwtClaimTypes.Role, "admin"),
                         new Claim("CustomClaim","CustomValue")
                     }
                 },
-                
-                new TestUser
+
+                new SeedUserModel
                 {
-                    SubjectId = "5",
+                    
                     Username = "raj",
-                    Password = "rwferfrfe",
+                    Password = "Raj@115",
+                    Email="raj115@gmail.com",
                     Claims = new List<Claim>
                     {
-                        new Claim(JwtClaimTypes.Email, "raj115@gmail.com"),
                         new Claim(JwtClaimTypes.Role, "stduser")
                     }
                 },
-                new TestUser
+                new SeedUserModel
                 {
-                    SubjectId = "3",
+                    
                     Username = "vishwanathan",
-                    Password = "wrrrfrf",
+                    Password = "Vish@1970",
+                    Email="vishwanathan1970@gmail.com",
                     Claims = new List<Claim>
                     {
-                        new Claim(JwtClaimTypes.Email, "support@procodeguide.com"),
                         new Claim(JwtClaimTypes.Role, "admin")
                     }
                 }

@@ -1,53 +1,73 @@
-﻿using AppIdentityServer.IdentityConfiguration;
+﻿using System;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using AppIdentityServer.IdentityConfiguration;
 using IdentityServer4.Models;
 using IdentityServer4.Services;
-
-using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AppIdentityServer.Services
 {
     public class ProfileService : IProfileService
     {
         private readonly ILogger<ProfileService> _logger;
+        
+        private readonly UserManager<IdentityUser> _userManager;
 
-        public ProfileService(ILogger<ProfileService> logger)
+        public ProfileService(ILogger<ProfileService> logger, UserManager<IdentityUser> userManager)
         {
             _logger = logger;
+            
+            _userManager = userManager;
         }
+
         public async Task GetProfileDataAsync(ProfileDataRequestContext context)
         {
             var sub = context.Subject.FindFirst("sub")?.Value;
 
             if (!string.IsNullOrEmpty(sub))
             {
-               
-                var user = Users.Get().Single(u => u.SubjectId == sub);
-                var roleClaim = user.Claims.FirstOrDefault(c => c.Type == "role");
-                if (roleClaim != null)
+                var user = await _userManager.FindByIdAsync(sub);
+
+                if (user != null)
                 {
-                    _logger.LogInformation($"Role claim found for user {sub}: {roleClaim.Value}");
+                    var claims = new List<Claim>
+                    {
+                        new Claim("name", user.UserName),
+                        new Claim("Email", user.Email ?? ""),
+                    };
+
+                    var userClaims = await _userManager.GetClaimsAsync(user);
+
+                    claims.AddRange(userClaims);
+
+                    _logger.LogInformation($"Found {userClaims.Count} claims for user {sub}");
+
+                    context.IssuedClaims.AddRange(claims);
                 }
                 else
                 {
-                    _logger.LogWarning($"Role claim not found for user {sub}");
+                    _logger.LogWarning($"User not found: {sub}");
                 }
-                var claims = new List<Claim>
-            {
-                new Claim("name", user.Username),
-                new Claim("email", user.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? ""),
-                new Claim("role", user.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? ""),
-                new Claim("CustomClaim", user.Claims.FirstOrDefault(c => c.Type == "CustomClaim")?.Value ?? "")
-                // Add more claims here
-            };
-
-                context.IssuedClaims.AddRange(claims);
             }
         }
 
         public async Task IsActiveAsync(IsActiveContext context)
         {
-            context.IsActive = true;
+            var sub = context.Subject.FindFirst("sub")?.Value;
+
+            if (!string.IsNullOrEmpty(sub))
+            {
+                var user = await _userManager.FindByIdAsync(sub);
+                context.IsActive = user != null;
+            }
+            else
+            {
+                context.IsActive = false;
+            }
         }
     }
-
 }

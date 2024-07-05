@@ -33,7 +33,7 @@ namespace AppIdentityServer.IdentityConfiguration
                 {
                     "openid",
                     "profile",
-                    "email",
+                    "Email",
                     "role",
                     "weatherApi.read",
                     "CustomClaim"
